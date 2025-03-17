@@ -41,7 +41,7 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
       let d1, d2, diceSum;
       let newBalance = user.balance - b;
       let message = "Perda!";
-      const chanceManipulacao = Math.random() < 0.51; // 25% de chance de contrariar a aposta
+      const chanceManipulacao = Math.random() < 0.55; // 25% de chance de contrariar a aposta
 
       if (chanceManipulacao) {
         // Manipula os dados para garantir que o jogador perca
@@ -71,13 +71,13 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
 
       // Verifica se o usuário ganhou ou perdeu
       if (c === "under" && diceSum < 7) {
-        newBalance = user.balance + b * 2;
+        newBalance = user.balance + b * 1.92;
         message = "Ganho!";
       } else if (c === "over" && diceSum > 7) {
-        newBalance = user.balance + b * 2;
+        newBalance = user.balance + b * 1.92;
         message = "Ganho!";
       } else if (c === "equal" && diceSum === 7) {
-        newBalance = user.balance + b * 10;
+        newBalance = user.balance + b * 8.7;
         message = "Ganho!";
       }
 
