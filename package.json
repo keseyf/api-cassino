@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "postinstall": "prisma generate",
     "start": "npm install && node dist/index.js",
     "dev": "tsc && clear && node --watch ./dist/server.js"
   },
