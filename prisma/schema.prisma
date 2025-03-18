@@ -14,15 +14,16 @@ datasource db {
 }
 
 model User {
-  id         String    @id @default(uuid())
-  username   String    @unique
-  email      String    @unique
-  password   String
-  balance    Float     @default(0)
-  created_at DateTime  @default(now())
-  role       String    @default("user")
-  bets       Bets[]
-  recharges  Payment[]
+  id          String     @id @default(uuid())
+  username    String     @unique
+  email       String     @unique
+  password    String
+  balance     Float      @default(0)
+  created_at  DateTime   @default(now())
+  role        String     @default("user")
+  bets        Bets[]
+  recharges   Payment[]
+  withdrawals Withdraw[]
 }
 
 model Payment {
@@ -34,6 +35,16 @@ model Payment {
   qrcode    String
   status    String   @default("pending")
   createdAt DateTime @default(now())
+}
+
+model Withdraw {
+  id         String   @id @default(uuid())
+  userId     String // Referência ao ID do usuário
+  amount     Float
+  withdrawId String   @unique
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id]) // Relacionamento com User
 }
 
 model Bets {

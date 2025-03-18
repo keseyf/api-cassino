@@ -41,7 +41,7 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
       let d1, d2, diceSum;
       let newBalance = user.balance - b;
       let message = "Perda!";
-      const chanceManipulacao = Math.random() < 0.55; // 25% de chance de contrariar a aposta
+      const chanceManipulacao = Math.random() < 0.97; // 25% de chance de contrariar a aposta
 
       if (chanceManipulacao) {
         // Manipula os dados para garantir que o jogador perca
