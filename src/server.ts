@@ -6,6 +6,7 @@ import GetBalance from "./routes/getBalance";
 import Recharge from "./routes/recharge";
 import Profile from "./routes/userProfile";
 import Uoseven from "./commands/uoseven";
+import { processWithdraw } from "./routes/withdrawl";
 
 const app = fastify();
 const port: number = 4040;
@@ -64,6 +65,14 @@ app.post("/api/user/profile", async (req, res) => {
 app.post("/api/games/uoseven", async (req, res) => {
   try {
     await Uoseven(req, res);
+  } catch {
+    res.status(500).send({ error: "Erro interno do servidor" });
+  }
+});
+
+app.post("/api/user/withdraw", async (req, res) => {
+  try {
+    await processWithdraw(req, res);
   } catch {
     res.status(500).send({ error: "Erro interno do servidor" });
   }

@@ -31,6 +31,10 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
       return res.status(404).send({ message: "Usuário não encontrado." });
     }
 
+    if (b < 0.5) {
+      return res.status(400).send({ message: "Minimo para aposta: R$0.50!" });
+    }
+
     if (user.balance < b) {
       return res
         .status(400)
@@ -41,15 +45,15 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
       let d1, d2, diceSum;
       let newBalance = user.balance - b;
       let message = "Perda!";
-      const chanceManipulacao = Math.random() < 0.97; // 25% de chance de contrariar a aposta
+      const chanceManipulacao = Math.random() < 0.97; // 97% de chance de manipulação
 
       if (chanceManipulacao) {
         // Manipula os dados para garantir que o jogador perca
         if (c === "under") {
-          d1 = Math.floor(Math.random() * 3) + 4; // Gera valores entre 4 e 6
+          d1 = Math.floor(Math.random() * 3) + 7; // Gera valores entre 4 e 6
           d2 = Math.floor(Math.random() * 6) + 1; // Normal
         } else if (c === "over") {
-          d1 = Math.floor(Math.random() * 3) + 1; // Gera valores entre 1 e 3
+          d1 = Math.floor(Math.random() * 3) + 3; // Gera valores entre 1 e 3
           d2 = Math.floor(Math.random() * 6) + 1; // Normal
         } else if (c === "equal") {
           do {

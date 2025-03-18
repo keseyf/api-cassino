@@ -21,6 +21,7 @@ model User {
   balance     Float      @default(0)
   created_at  DateTime   @default(now())
   role        String     @default("user")
+  pix         String?
   bets        Bets[]
   recharges   Payment[]
   withdrawals Withdraw[]
@@ -41,7 +42,7 @@ model Withdraw {
   id         String   @id @default(uuid())
   userId     String // Referência ao ID do usuário
   amount     Float
-  withdrawId String   @unique
+  withdrawId String   @unique @default(uuid())
   status     String   @default("pending")
   createdAt  DateTime @default(now())
   user       User     @relation(fields: [userId], references: [id]) // Relacionamento com User

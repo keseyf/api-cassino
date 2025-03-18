@@ -1,74 +1,96 @@
-// import { PrismaClient } from "@prisma/client";
-// import mercadopago from "mercadopago";
+import { PrismaClient } from "@prisma/client";
+import { MercadoPagoConfig, Payment } from "mercadopago";
+import dotenv from "dotenv";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { FastifyReply, FastifyRequest } from "fastify";
 
-// const prisma = new PrismaClient();
+dotenv.config();
 
-// mercadopago.configurations.setAccessToken("YOUR_MERCADO_PAGO_ACCESS_TOKEN");
+const prisma = new PrismaClient();
+const MPToken = process.env.TOKEN_MP;
 
-// async function withdrawFunds(userId: string, amount: number) {
-//   // Verificar se o usuário existe
-//   const user = await prisma.user.findUnique({ where: { id: userId } });
-//   if (!user) {
-//     throw new Error("Usuário não encontrado.");
-//   }
+if (!MPToken) {
+  throw new Error("MercadoPago access token não definido.");
+}
 
-//   // Verificar se o usuário tem saldo suficiente
-//   if (user.balance < amount) {
-//     throw new Error("Saldo insuficiente.");
-//   }
+const client = new MercadoPagoConfig({ accessToken: MPToken });
+const payment = new Payment(client);
 
-//   // Criar o saque no banco de dados
-//   const withdrawal = await prisma.withdraw.create({
-//     data: {
-//       email: user.email,
-//       userId: user.id,
-//       amount,
-//       status: "pending",
-//       withdrawId: generateWithdrawId(),
-//     },
-//   });
+export async function processWithdraw(req: FastifyRequest, res: FastifyReply) {
+  // Função para gerar um ID único para o saque
+  function generateWithdrawId(): string {
+    return "withdraw-" + Math.random().toString(36).substring(2, 15);
+  }
 
-//   // Realizar o saque via Mercado Pago
-//   try {
-//     const paymentData = {
-//       transaction_amount: amount,
-//       description: `Saque de ${amount}`,
-//       payer_email: user.email,
-//       payment_method_id: "pix", // Usando o método de pagamento PIX
-//     };
+  const { a, v } = req.body as { a: string; v: number };
 
-//     const payment = await mercadopago.payment.create(paymentData);
+  if (!a || !v) {
+    throw new Error("Alguma variável não definida ou valor inválido.");
+  }
 
-//     // Atualizar o saque com o ID do pagamento do Mercado Pago
-//     await prisma.withdraw.update({
-//       where: { id: withdrawal.id },
-//       data: {
-//         withdrawId: payment.response.id,
-//         status: "completed", // Atualiza para "completed" caso o pagamento seja bem-sucedido
-//       },
-//     });
+  const decoded = jwt.decode(a) as JwtPayload | null;
+  if (!decoded || !decoded.pix || !decoded.id) {
+    throw new Error("Pix ou ID do usuário não encontrado no token.");
+  }
 
-//     // Atualizar o saldo do usuário
-//     await prisma.user.update({
-//       where: { id: user.id },
-//       data: {
-//         balance: user.balance - amount,
-//       },
-//     });
+  const pix = String(decoded.pix);
+  if (!pix) {
+    return res.send({ message: "Chave pix nao definida" });
+  }
+  // Verificar se a chave PIX já foi usada por outro usuário
+  const existingUserWithPix = await prisma.user.findFirst({ where: { pix } });
+  if (existingUserWithPix) {
+    throw new Error("Chave PIX já utilizada por outro usuário!");
+  }
 
-//     return { message: "Saque realizado com sucesso." };
-//   } catch (error) {
-//     console.error(error);
-//     await prisma.withdraw.update({
-//       where: { id: withdrawal.id },
-//       data: {
-//         status: "failed",
-//       },
-//     });
-//     throw new Error("Erro ao realizar saque.");
-//   }
-// }
+  // Buscar usuário pelo token JWT
+  const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+  if (!user) {
+    throw new Error("Usuário não encontrado.");
+  }
 
-// function generateWithdrawId() {
-//   return "withdraw-" + Math.random().toString(36).substring(2, 15); // Gera um ID único simples
-// }
+  // Verificar saldo do usuário
+  if (user.balance < v) {
+    throw new Error("Saldo insuficiente.");
+  }
+
+  // Criar registro de saque no banco de dados
+  const withdrawal = await prisma.withdraw.create({
+    data: {
+      userId: user.id,
+      amount: v,
+      status: "pending",
+    },
+  });
+
+  // Criar pagamento no Mercado Pago
+  const paymentData = {
+    transaction_amount: v,
+    description: `Saque de R$ ${v.toFixed(2)}`,
+    payment_method_id: "pix",
+    payer: { email: user.email },
+  };
+
+  const createdPayment = await payment.create({ body: paymentData });
+
+  if (!createdPayment || !createdPayment.id) {
+    throw new Error("Erro ao criar pagamento no Mercado Pago.");
+  }
+
+  // Atualizar saque no banco de dados
+  await prisma.withdraw.update({
+    where: { id: withdrawal.id },
+    data: {
+      withdrawId: createdPayment.id.toString(), // ✅ Convertendo ID para string
+      status: "completed",
+    },
+  });
+
+  // Atualizar saldo do usuário
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { balance: user.balance - v },
+  });
+
+  return { message: "Saque realizado com sucesso." };
+}
