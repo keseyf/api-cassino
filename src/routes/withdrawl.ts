@@ -24,37 +24,46 @@ export async function processWithdraw(req: FastifyRequest, res: FastifyReply) {
 
   const { a, v } = req.body as { a: string; v: number };
 
+  // Verifica se os dados necessários estão presentes
   if (!a || !v) {
-    throw new Error("Alguma variável não definida ou valor inválido.");
+    return res
+      .status(400)
+      .send({ message: "Alguma variável não definida ou valor inválido." });
   }
 
   const decoded = jwt.decode(a) as JwtPayload | null;
-  if (!decoded || !decoded.pix || !decoded.id) {
-    throw new Error("Pix ou ID do usuário não encontrado no token.");
+  // Verifica se o token contém as informações do usuário
+  if (!decoded || !decoded.pix) {
+    return res
+      .status(400)
+      .send({ message: "Pix ou ID do usuário não encontrado no token." });
   }
 
   const pix = String(decoded.pix);
   if (!pix) {
-    return res.send({ message: "Chave pix nao definida" });
+    return res.status(400).send({ message: "Chave pix não definida" });
   }
-  // Verificar se a chave PIX já foi usada por outro usuário
+
+  // Verifica se a chave PIX já foi associada a outro usuário
   const existingUserWithPix = await prisma.user.findFirst({ where: { pix } });
   if (existingUserWithPix) {
-    throw new Error("Chave PIX já utilizada por outro usuário!");
+    return res
+      .status(400)
+      .send({ message: "Chave PIX já utilizada por outro usuário!" });
   }
 
-  // Buscar usuário pelo token JWT
+  // Busca o usuário com base no ID decodificado do token
   const user = await prisma.user.findUnique({ where: { id: decoded.id } });
   if (!user) {
-    throw new Error("Usuário não encontrado.");
+    return res.status(404).send({ message: "Usuário não encontrado." });
   }
 
-  // Verificar saldo do usuário
+  // Verifica se o usuário tem saldo suficiente
   if (user.balance < v) {
-    throw new Error("Saldo insuficiente.");
+    return res.status(400).send({ message: "Saldo insuficiente." });
   }
 
-  // Criar registro de saque no banco de dados
+  // Cria o registro do saque no banco de dados
   const withdrawal = await prisma.withdraw.create({
     data: {
       userId: user.id,
@@ -63,7 +72,7 @@ export async function processWithdraw(req: FastifyRequest, res: FastifyReply) {
     },
   });
 
-  // Criar pagamento no Mercado Pago
+  // Dados do pagamento a ser feito no MercadoPago
   const paymentData = {
     transaction_amount: v,
     description: `Saque de R$ ${v.toFixed(2)}`,
@@ -71,26 +80,38 @@ export async function processWithdraw(req: FastifyRequest, res: FastifyReply) {
     payer: { email: user.email },
   };
 
-  const createdPayment = await payment.create({ body: paymentData });
-
-  if (!createdPayment || !createdPayment.id) {
-    throw new Error("Erro ao criar pagamento no Mercado Pago.");
+  let createdPayment;
+  try {
+    createdPayment = await payment.create({ body: paymentData });
+  } catch (err) {
+    return res.status(500).send({
+      message: "Erro ao criar pagamento no Mercado Pago.",
+      error: err,
+    });
   }
 
-  // Atualizar saque no banco de dados
+  // Verifica se o pagamento foi criado com sucesso
+  if (!createdPayment || !createdPayment.id) {
+    return res
+      .status(500)
+      .send({ message: "Erro ao criar pagamento no Mercado Pago." });
+  }
+
+  // Atualiza o saque no banco de dados com o ID do pagamento do MercadoPago
   await prisma.withdraw.update({
     where: { id: withdrawal.id },
     data: {
-      withdrawId: createdPayment.id.toString(), // ✅ Convertendo ID para string
+      withdrawId: createdPayment.id.toString(), // Convertendo o ID para string
       status: "completed",
     },
   });
 
-  // Atualizar saldo do usuário
+  // Atualiza o saldo do usuário no banco de dados
   await prisma.user.update({
     where: { id: user.id },
     data: { balance: user.balance - v },
   });
 
-  return { message: "Saque realizado com sucesso." };
+  // Retorna a resposta de sucesso
+  return res.status(200).send({ message: "Saque realizado com sucesso." });
 }

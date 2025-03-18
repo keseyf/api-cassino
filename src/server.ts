@@ -72,9 +72,11 @@ app.post("/api/games/uoseven", async (req, res) => {
 
 app.post("/api/user/withdraw", async (req, res) => {
   try {
+    console.log("Body recebido:", req.body); // Log para verificar a requisição
     await processWithdraw(req, res);
-  } catch {
-    res.status(500).send({ error: "Erro interno do servidor" });
+  } catch (error) {
+    console.error("Erro ao processar o saque:", error);
+    res.status(500).send({ message: "Erro interno do servidor " + "erro" });
   }
 });
 

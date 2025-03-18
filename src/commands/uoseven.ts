@@ -37,8 +37,8 @@ export default async function Uoseven(req: FastifyRequest, res: FastifyReply) {
 
     if (user.balance < b) {
       return res
-        .status(400)
-        .send({ message: "Saldo menor que valor de aposta!" });
+        .status(200)
+        .send({ message: "Saldo menor que valor de aposta!", d1: 1, d2: 1 });
     }
 
     try {
